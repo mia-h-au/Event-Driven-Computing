@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="">
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+    <script src="https://unpkg.com/rxjs/bundles/rxjs.umd.min.js"></script>
+
+    <style>
+        .mouse {
+            position: absolute;
+            margin-top: -0.5em;
+            margin-left: -0.5em;
+            width: 1em;
+            height: 1em;
+            border: none;
+            border-radius: 0.5em;
+            transition: top 0.09s, left 0.09s;
+        }
+
+        body {
+            height: 100vh;
+            background-color: ghostwhite;
+        }
+
+        main {
+            margin-top: 2em;
+            height: 80vh;
+            border: 1px solid lightgrey;
+        }
+    </style>
+  </head>
+  <body>
+    <header>
+      <input id="col" type="text" />
+      <button onclick="mycol = document.querySelector('#col').value;">CLICK</button></header>
+    <main>&nbsp;</main>
+    <footer></footer>
+    <script>
+
+      const { fromEvent } = rxjs;
+      const { map, auditTime } = rxjs.operators;
+
+      let body = document.body;
+      let main = document.querySelector('main');
+
+      let mycol = 'hotpink'
+
+      // Connect to server
+      var socket = io.connect('http://localhost:3000');
+
+      // Socket input; from server
+      fromEvent(socket,'mouse').pipe(
+        map(
+          (x) => JSON.parse(x)
+        )
+      ).subscribe(function(mice) {
+          let mdots = document.querySelectorAll('.mouse');
+          // remove extra dots
+          while(mdots.length > mice.length){
+              main.removeChild(mdots[mdots.length-1]);
+              mdots = document.querySelectorAll('.mouse');
+          }
+          // add new dots
+          while(mice.length > mdots.length){
+              let mdiv = document.createElement("DIV");
+              mdiv.classList.add('mouse');
+              main.appendChild(mdiv);
+              mdots = document.querySelectorAll('.mouse');
+          }
+          // update dots
+          for(let i = 0; i < mice.length; i++){
+              mdots[i].style.top = mice[i][1]+'%';
+              mdots[i].style.left = mice[i][0]+'%';
+              mdots[i].style.backgroundColor = mice[i][2];
+          }
+      });
+
+      // User input; send to server
+      fromEvent(main,'mousemove').pipe(
+        map((mouse) => {
+            return [(mouse.x/window.innerWidth)*100,
+                    (mouse.y/window.innerHeight)*100,mycol];
+        }),
+        auditTime(10)
+      ).subscribe(function(mouse) {
+        socket.emit('mouse',JSON.stringify(mouse));
+      });
+       
+    </script>
+  </body>
+</html>
